@@ -11,9 +11,10 @@ use UNIVERSAL 'isa';
 
 use vars qw{$VERSION $errstr};
 BEGIN {
-	$VERSION = 0.6;
-	$errstr = '';
+	$VERSION = '1.0';
+	$errstr  = '';
 }
+
 
 
 
@@ -182,7 +183,7 @@ sub _check_keyword {
 sub _check_url {
 	my $self = shift;
 	my $url = shift or return $self->_error( 'You did not provide a tracker URL' );
-	unless ( $url =~ m!^http://[\w.]+/! ) {
+	unless ( $url =~ m!^https?://[\w.]+/! ) {
 		return $self->_error( 'The tracker URL format appears to be invalid' );
 	}
 	unless ( $url =~ /\%n/ ) {
@@ -222,7 +223,7 @@ HTML::TrackerLink - Autogenerates links to Bug/Tracker systems
   
   # Create a linker for multiple named systems
   $Linker = HTML::TrackerLink->new(
-          'bug' => 'http://host1/path?id=%n',
+          'bug'     => 'http://host1/path?id=%n',
           'tracker' => 'http://host2/path?id=%n',
           );
   
@@ -271,12 +272,12 @@ make sure that they actually contain the %n placeholder.
 HTML::TrackerLink does two types of searches in the source text, a 'default'
 search, and 'keyword' searches.
 
-A default search will look for B<only> for a number with a preceding hash,
+A default search will look B<only> for a number with a preceding hash,
 like '#12345'. Note that the default search will NOT match with naked numbers,
 such as '12345'.
 
 A keyword search is a little more flexible. For a 'bug' keyword search, the
-following would all be valid.
+following would all be valid, and matched against.
 
   bug 12345        # Simplest form
   Bug 12345        # Case insensitive
@@ -290,20 +291,20 @@ The keyword search would B<NOT> match with the following
   bug#12345        # Even in this case
   bigbug 12345     # 'bug' must be a seperate word
 
-All of these searches are performed simultaneously, meaning that given both a
+All of these searches are performed condurrently, meaning that given both a
 default search, and a C<'bug'> keyword search, the following would match the
 way you would expect it to.
 
   Client issue #435 ( Bug #1532 ) fixed
 
 The C<'Bug #1532'> would link to your bug tracking system, and the C<'#435'> would
-link to your client feedback tracking system.
+link to your client feedback tracking system, which is the default.
 
 =head2 Keyword Format
 
 The keyword can be up to 32 characters long, containing only word characters,
 and cannot start with a number. Irrelevant of the case passed, the keywords
-are stored internally in lowercase. As such, you cannot have to seperate
+are stored internally in lowercase. As such, you cannot have two seperate
 keyword searchs for C<'bug'>, and C<'BUG'>.
 
 =head1 METHODS
@@ -313,13 +314,13 @@ keyword searchs for C<'bug'>, and C<'BUG'>.
 The C<new> constructor takes a variety of arguments and returns a new
 HTML::TrackerLink processing object.
 
-Arguments to C<new> are accepted in the following formats.
+Arguments to C<new> are accepted in one of the following formats.
 
 =over 4
 
 =item new
 
-A empty HTML::LinkTracker object is created without any searches
+A empty HTML::LinkTracker object is created without any trackers set
 
 =item new $tracker_url
 
@@ -413,7 +414,9 @@ any bugs encountered.
 
 =head1 SUPPORT
 
-Bugs should be filed via http://rt.cpan.org/
+Bugs should be reported via the CPAN bug tracker at
+
+  http://rt.cpan.org/NoAuth/ReportBug.html?Queue=HTML%3A%3ATrackerLink
 
 For other issues, contact the author
 
@@ -425,7 +428,7 @@ For other issues, contact the author
 
 =head1 COPYRIGHT
 
-Copyright (c) 2002-2003 Adam Kennedy. All rights reserved.
+Copyright (c) 2002-2004 Adam Kennedy. All rights reserved.
 This program is free software; you can redistribute
 it and/or modify it under the same terms as Perl itself.
 

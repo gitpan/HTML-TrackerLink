@@ -10,7 +10,7 @@ SYNOPSIS
   
       # Create a linker for multiple named systems
       $Linker = HTML::TrackerLink->new(
-              'bug' => 'http://host1/path?id=%n',
+              'bug'     => 'http://host1/path?id=%n',
               'tracker' => 'http://host2/path?id=%n',
               );
   
@@ -57,12 +57,12 @@ DESCRIPTION
     HTML::TrackerLink does two types of searches in the source text, a
     'default' search, and 'keyword' searches.
 
-    A default search will look for only for a number with a preceding hash,
-    like '#12345'. Note that the default search will NOT match with naked
+    A default search will look only for a number with a preceding hash, like
+    '#12345'. Note that the default search will NOT match with naked
     numbers, such as '12345'.
 
     A keyword search is a little more flexible. For a 'bug' keyword search,
-    the following would all be valid.
+    the following would all be valid, and matched against.
 
       bug 12345        # Simplest form
       Bug 12345        # Case insensitive
@@ -76,29 +76,30 @@ DESCRIPTION
       bug#12345        # Even in this case
       bigbug 12345     # 'bug' must be a seperate word
 
-    All of these searches are performed simultaneously, meaning that given
+    All of these searches are performed condurrently, meaning that given
     both a default search, and a 'bug' keyword search, the following would
     match the way you would expect it to.
 
       Client issue #435 ( Bug #1532 ) fixed
 
     The 'Bug #1532' would link to your bug tracking system, and the '#435'
-    would link to your client feedback tracking system.
+    would link to your client feedback tracking system, which is the
+    default.
 
   Keyword Format
     The keyword can be up to 32 characters long, containing only word
     characters, and cannot start with a number. Irrelevant of the case
     passed, the keywords are stored internally in lowercase. As such, you
-    cannot have to seperate keyword searchs for 'bug', and 'BUG'.
+    cannot have two seperate keyword searchs for 'bug', and 'BUG'.
 
 METHODS
   new
     The "new" constructor takes a variety of arguments and returns a new
     HTML::TrackerLink processing object.
 
-    Arguments to "new" are accepted in the following formats.
+    Arguments to "new" are accepted in one of the following formats.
 
-    new A empty HTML::LinkTracker object is created without any searches
+    new A empty HTML::LinkTracker object is created without any trackers set
 
     new $tracker_url
         If a single argument is passed, the argument is assume be the
@@ -183,7 +184,9 @@ TO DO
     bugs encountered.
 
 SUPPORT
-    Bugs should be filed via http://rt.cpan.org/
+    Bugs should be reported via the CPAN bug tracker at
+
+      http://rt.cpan.org/NoAuth/ReportBug.html?Queue=HTML%3A%3ATrackerLink
 
     For other issues, contact the author
 
@@ -193,7 +196,7 @@ AUTHORS
             http://ali.as/
 
 COPYRIGHT
-    Copyright (c) 2002-2003 Adam Kennedy. All rights reserved. This program
+    Copyright (c) 2002-2004 Adam Kennedy. All rights reserved. This program
     is free software; you can redistribute it and/or modify it under the
     same terms as Perl itself.
 
