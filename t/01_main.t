@@ -7,7 +7,7 @@ use File::Spec::Functions qw{:ALL};
 use lib catdir( updir(), updir(), 'modules' ), # Development testing
         catdir( updir(), 'lib' );              # Installation testing
 use UNIVERSAL 'isa';
-use Test::More tests => 2;
+use Test::More tests => 5;
 
 # Check their perl version
 BEGIN {
@@ -22,5 +22,14 @@ BEGIN {
 # Does the module load
 use_ok( 'HTML::TrackerLink' );
 
-1;
 
+
+
+
+# A couple of very basic tests
+my $Linker = HTML::TrackerLink->new();
+ok( defined $Linker, "->new() returns defined" );
+ok( $Linker, "->new() returns true" );
+isa_ok( $Linker, 'HTML::TrackerLink' );
+
+1;

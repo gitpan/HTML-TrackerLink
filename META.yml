@@ -1,11 +1,10 @@
 # http://module-build.sourceforge.net/META-spec.html
 #XXXXXXX This is a prototype!!!  It will change in the future!!! XXXXX#
 name:         HTML-TrackerLink
-version:      0.5
+version:      0.6
 version_from: lib/HTML/TrackerLink.pm
 installdirs:  site
 requires:
-    File::Spec:                    0.83
     Test::More:                    0
 
 distribution_type: module

@@ -1,17 +1,17 @@
 package HTML::TrackerLink;
 
-# HTML::TrackerLink is a package for automatucally finding tracker references
+# HTML::TrackerLink is a package for automatically finding tracker references
 # in the form of 'Keyword 12345' or '#12345', and converting them into links into
 # the external tracking system.
 
-# See POD below for more details#
+# See POD below for more details
 
 use strict;
 use UNIVERSAL 'isa';
 
 use vars qw{$VERSION $errstr};
 BEGIN {
-	$VERSION = 0.5;
+	$VERSION = 0.6;
 	$errstr = '';
 }
 
@@ -25,26 +25,23 @@ sub new {
 	# Create our object
 	my $self = bless {
 		keywords => {},
-		};
+		}, $class;
+	return $self unless @_;
 
-	# Handle the possible arguments
-	if ( scalar @_ == 0 ) {
-		# Nothing to do
-		return $self;
-
-	} elsif ( scalar @_ == 1 ) {
+	# Handle arguments
+	if ( @_ == 1 ) {
 		# Should be a tracker URL for the default search
 		my $url = shift;
-		return undef unless $self->_checkUrl( $url );
+		return undef unless $self->_check_url( $url );
 
 		# Set the default search
 		$self->{default} = $url;
 
-	} elsif ( scalar @_ == 2 ) {
+	} elsif ( @_ == 2 ) {
 		# Should be a single keyword/url pair
 		my ($keyword, $url) = @_;
-		return undef unless $self->_checkKeyword( $keyword );
-		return undef unless $self->_checkUrl( $url );
+		return undef unless $self->_check_keyword( $keyword );
+		return undef unless $self->_check_url( $url );
 
 		# Set the keyword
 		$self->{keywords}->{$keyword} = $url;
@@ -57,11 +54,11 @@ sub new {
 		my %keywords = @_;
 		foreach my $keyword ( sort keys %keywords ) {
 			my $url = $keywords{$keyword};
-			unless ( $self->_checkKeyword( $keyword ) ) {
+			unless ( $self->_check_keyword( $keyword ) ) {
 				return $self->_error( "Invalid keyword '$keyword': "
 					. $self->errstr );
 			}
-			unless ( $self->_checkUrl( $keyword ) ) {
+			unless ( $self->_check_url( $keyword ) ) {
 				return $self->_error( "Bad URL for keyword '$keyword': "
 					. $self->errstr );
 			}
@@ -86,13 +83,11 @@ sub keywords {
 # Get or set a keyword search
 sub keyword {
 	my $self = shift;
-	my $keyword = $self->_checkKeyword( $_[0] )
-		? shift : return undef;
+	my $keyword = $self->_check_keyword($_[0]) ? shift : return undef;
 	return $self->{keywords}->{$keyword} unless @_;
 
 	# Set the tracker URL
-	my $url = $self->_checkUrl( $_[0] )
-		? shift : return undef;
+	my $url = $self->_check_url($_[0]) ? shift : return undef;
 	$self->{keywords}->{$keyword} = $url;
 }
 
@@ -104,8 +99,7 @@ sub default {
 		: $self->{default} unless @_;
 
 	# Try to set the default search
-	my $url = $self->_checkUrl( $_[0] )
-		? shift : return undef;
+	my $url = $self->_check_url($_[0]) ? shift : return undef;
 
 	# In case they are using a keyword, remove it
 	delete $self->{default_keyword};
@@ -115,8 +109,7 @@ sub default {
 # Make the default search the same as a particular keyword
 sub default_keyword {
 	my $self = shift;
-	my $keyword = $self->_checkKeyword( $_[0] )
-		? shift : return undef;
+	my $keyword = $self->_check_keyword($_[0]) ? shift : return undef;
 
 	# Does the keyword exist?
 	unless ( exists $self->{keywords}->{$keyword} ) {
@@ -178,19 +171,17 @@ sub errstr { $errstr }
 #####################################################################
 # Private Methods
 
-sub _checkKeyword {
+sub _check_keyword {
 	my $self = shift;
-	my $kw = shift;
-	return $self->_error( 'You did not provide a keyword' ) unless $kw;
+	my $kw = shift or return $self->_error( 'You did not provide a keyword' );
 	return $self->_error( 'Keyword contains non-word characters' ) if $kw =~ /\W/;
 	return $self->_error( 'Keyword cannot start with a number' ) if $kw =~ /^\d/;
 	1;
 }
 
-sub _checkUrl {
+sub _check_url {
 	my $self = shift;
-	my $url = shift;
-	return $self->_error( 'You did not provide a tracker URL' ) unless $url;
+	my $url = shift or return $self->_error( 'You did not provide a tracker URL' );
 	unless ( $url =~ m!^http://[\w.]+/! ) {
 		return $self->_error( 'The tracker URL format appears to be invalid' );
 	}
