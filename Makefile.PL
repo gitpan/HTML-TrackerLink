@@ -1,13 +1,9 @@
-require 5.000;
-use ExtUtils::MakeMaker;
-WriteMakefile(
-	'NAME'         => 'HTML::TrackerLink',
-	'VERSION_FROM' => 'lib/HTML/TrackerLink.pm',
-	'PREREQ_PM'    => {
-		Test::More => 0,
-	},
-	($] >= 5.005) ? (
-		'AUTHOR'   => 'Adam Kennedy (cpan@ali.as)',
-		'ABSTRACT' => 'Automatically insert links to multiple tracking systems in text',
-	) : (),
-);
+use strict;
+use inc::Module::Install;
+
+name           'HTML-TrackerLink';
+all_from       'lib/HTML/TrackerLink.pm';
+build_requires 'File::Spec'      => '0.80';
+build_requires 'Test::More'      => '0.47';
+
+WriteAll;

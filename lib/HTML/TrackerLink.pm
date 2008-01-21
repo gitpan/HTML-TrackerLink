@@ -6,12 +6,12 @@ package HTML::TrackerLink;
 
 # See POD below for more details
 
+use 5.006;
 use strict;
-use UNIVERSAL 'isa';
 
 use vars qw{$VERSION $errstr};
 BEGIN {
-	$VERSION = '1.0';
+	$VERSION = '1.03';
 	$errstr  = '';
 }
 
@@ -19,14 +19,16 @@ BEGIN {
 
 
 
-# Constructor
+#####################################################################
+# Constructor and Accessors
+
 sub new {
 	my $class = shift;
 
 	# Create our object
 	my $self = bless {
 		keywords => {},
-		}, $class;
+	}, $class;
 	return $self unless @_;
 
 	# Handle arguments
@@ -45,7 +47,7 @@ sub new {
 		return undef unless $self->_check_url( $url );
 
 		# Set the keyword
-		$self->{keywords}->{$keyword} = $url;
+		$self->{keywords}->{lc $keyword} = $url;
 
 		# Set the default search to be the same
 		$self->{default_keyword} = $keyword;
@@ -59,7 +61,7 @@ sub new {
 				return $self->_error( "Invalid keyword '$keyword': "
 					. $self->errstr );
 			}
-			unless ( $self->_check_url( $keyword ) ) {
+			unless ( $self->_check_url( $url ) ) {
 				return $self->_error( "Bad URL for keyword '$keyword': "
 					. $self->errstr );
 			}
@@ -77,14 +79,24 @@ sub new {
 
 # Return the currently defined keywords
 sub keywords {
-	my $self = shift;
-	sort keys %{ $self->{keywords} };
+	if ( wantarray ) {
+		return sort keys %{ $_[0]->{keywords} };
+	} else {
+		return scalar keys %{ $_[0]->{keywords} };
+	}
 }
+
+
+
+
+
+#####################################################################
+# Main Methods
 
 # Get or set a keyword search
 sub keyword {
 	my $self = shift;
-	my $keyword = $self->_check_keyword($_[0]) ? shift : return undef;
+	my $keyword = $self->_check_keyword($_[0]) ? lc shift : return undef;
 	return $self->{keywords}->{$keyword} unless @_;
 
 	# Set the tracker URL
@@ -110,7 +122,7 @@ sub default {
 # Make the default search the same as a particular keyword
 sub default_keyword {
 	my $self = shift;
-	my $keyword = $self->_check_keyword($_[0]) ? shift : return undef;
+	my $keyword = $self->_check_keyword($_[0]) ? lc shift : return undef;
 
 	# Does the keyword exist?
 	unless ( exists $self->{keywords}->{$keyword} ) {
@@ -129,36 +141,95 @@ sub process {
 	my $text = (@_ and defined $_[0]) ? shift
 		: return $self->_error( 'You did not provide a string to process' );
 
-	# Do the replacement for each of the keywords
-	foreach my $keyword ( sort keys %{ $self->{keywords} } ) {
-		my $url = $self->{keywords}->{$keyword};
-
-		# Create the search regex and do the replace
-		my $search = qr/\b($keyword\s+\#?(\d+))/i;
-		$text =~ s/$search/$self->_replacer( $url, $1, $2 )/eg;
+	# Prepare the transforms
+	my @replace = ();
+	if ( $self->keywords ) {
+		my $any_keyword = '(?:' . join('|', $self->keywords) .')';
+		push @replace, [
+			qr/\b($any_keyword)\s+\#?(\d+)/is,
+			sub { $self->_replace(
+				$self->{keywords}->{lc $_[3]}, $_[2], $_[4],
+			) },
+		];
+	}
+	if ( $self->default ) {
+		push @replace, [
+			qr/\#(\d+)/s,
+			sub { $self->_replace(
+				$self->default, $_[2], $_[3],
+			) },
+		];
 	}
 
-	# Shortcut if we don't have to do the default replace
-	my $default = $self->default or return $text;
+	# Hand off to the main substitution method
+	return $self->_subst( $text, @replace );
+}
 
-	# We handle this differently, depending on whether there
-	# were any keywords or not.
-	my @keywords = $self->keywords;
-	if ( @keywords ) {
-		# To match the default, we need to do a negative look-behind
-		# assertion for any of the keywords, since the things we
-		# matched should be still completely intact.
-		my $any_keywords = join '|', @keywords;
-		my $search = qr/(?<!(?:$any_keywords))\s+(\#(\d+))/i;
-		$text =~ s/$search/$self->_replacer( $default, $1, $2 )/eg;
+# Implement the parallel substitution
+sub _subst {
+	my $self  = shift;
+	my $input = shift;
 
-	} else {
-		# Just do a regular search for anything like #1234 we can find
-		my $search = qr/(\#(\d+))/;
-		$text =~ s/$search/$self->_replacer( $default, $1, $2 )/eg;
+	# Map the match regex to capture everything BEFORE the match,
+	# and the entire pattern provided.
+	# (We'll provide them as the first params)
+	my @try = map { [ qr/\G(.*?)($_->[0])/s => $_->[1] ] } @_;
+	unless ( @try ) {
+		# Handle the pathological no-replace case
+		return $input;
 	}
 
-	$text;
+	# Start the main loop
+	my $position = 0;
+	my $len      = length $input;
+	my $output   = '';
+	while ( $position < $len ) {
+		my $found = undef;
+		my @start = ();
+		my @end   = ();
+		foreach my $r ( @try ) {
+			# Skip if it is not in the string
+			pos $input = $position;
+			next unless $input =~ $r->[0];
+
+			# Skip if it DOESN'T match earlier
+			if ( $found and $start[2] <= $-[2] ) {
+				next;
+			}
+
+			# This is the best option.
+			# Save the matching regex
+			$found = $r->[1];
+			@start = @-;
+			@end   = @+;
+		}
+
+		# Break out if no more matches
+		last unless $found;
+
+		# Append the pre-match string to the output
+		$output .= substr( $input, $start[1], $end[1] - $start[1] );
+
+		# Pass the rest to the transform function
+		my $rv = $found->(
+			map {
+				substr( $input, $start[$_], $end[$_] - $start[$_] )
+			} 0 .. $#end
+		);
+		unless ( defined $rv ) {
+			# Transform is signaling an error
+			return undef;
+		}
+
+		# Transform completed ok
+		$output .= $rv;
+
+		# Move the match position for the next iteration
+		$position = $end[2];
+	}
+
+	# Append the remainder of the string
+	return $output . substr( $input, $position );
 }
 
 # Return any error message
@@ -168,16 +239,15 @@ sub errstr { $errstr }
 
 
 
-
 #####################################################################
-# Private Methods
+# Support Methods
 
 sub _check_keyword {
 	my $self = shift;
 	my $kw = shift or return $self->_error( 'You did not provide a keyword' );
 	return $self->_error( 'Keyword contains non-word characters' ) if $kw =~ /\W/;
-	return $self->_error( 'Keyword cannot start with a number' ) if $kw =~ /^\d/;
-	1;
+	return $self->_error( 'Keyword cannot start with a number' )   if $kw =~ /^\d/;
+	return 1;
 }
 
 sub _check_url {
@@ -189,16 +259,16 @@ sub _check_url {
 	unless ( $url =~ /\%n/ ) {
 		return $self->_error( 'The tracker URL does not contain a %n placeholder' );
 	}
-	1;
+	return 1;
 }
 
 # Generates the link in the replacer
-sub _replacer {
+sub _replace {
 	my ($self, $url, $text, $id) = @_;
 
 	# Create the link
 	$url =~ s/\%n/$id/g;
-	"<a href='$url'>$text</a>";
+	return "<a href='$url'>$text</a>";
 }
 
 sub _error { $errstr = $_[1]; undef }
@@ -216,26 +286,26 @@ HTML::TrackerLink - Autogenerates links to Bug/Tracker systems
 =head1 SYNOPSIS
 
   # Create a linker for only #12345 for a single tracker system
-  my $Linker = HTML::TrackerLink->new( 'http://host/path?id=%n' );
+  my $linker = HTML::TrackerLink->new( 'http://host/path?id=%n' );
   
   # Create a linker for a single named ( 'Bug #12345' ) system
-  $Linker = HTML::TrackerLink->new( 'bug', 'http://host/path?id=%n' );
+  $linker = HTML::TrackerLink->new( 'bug', 'http://host/path?id=%n' );
   
   # Create a linker for multiple named systems
-  $Linker = HTML::TrackerLink->new(
+  $linker = HTML::TrackerLink->new(
           'bug'     => 'http://host1/path?id=%n',
           'tracker' => 'http://host2/path?id=%n',
           );
   
   # For the multiple linker, make it default to an arbitrary system
-  $Linker->default( 'http://host/path?id=%n' );
+  $linker->default( 'http://host/path?id=%n' );
   
   # For the multiple linker, make it default to one of the keywords
-  $Linker->default_keyword( 'bug' );
+  $linker->default_keyword( 'bug' );
   
   # Process a string, and add links
   my $string = 'Fix for bug 1234, described in client request CT #1234';
-  $string = $Linker->process( $string );
+  $string = $linker->process( $string );
 
 =head1 DESCRIPTION
 
@@ -399,12 +469,12 @@ error message. C<errstr> can be called as either a static or object method.
 i.e. The following are equivalent
 
   # Calling errstr as a static method
-  my $Linker = HTML::TrackerLink->new( 'badurl' );
+  my $linker = HTML::TrackerLink->new( 'badurl' );
   die HTML::TrackerLink->errstr;
 
   # Calling errstr as an object method
-  my $Linker = HTML::TrackerLink->new( 'badurl' );
-  die $Linker->errstr;
+  my $linker = HTML::TrackerLink->new( 'badurl' );
+  die $linker->errstr;
 
 =head1 TO DO
 
@@ -416,19 +486,18 @@ any bugs encountered.
 
 Bugs should be reported via the CPAN bug tracker at
 
-  http://rt.cpan.org/NoAuth/ReportBug.html?Queue=HTML%3A%3ATrackerLink
+L<http://rt.cpan.org/NoAuth/ReportBug.html?Queue=HTML-TrackerLink>
 
-For other issues, contact the author
+For other issues, or commercial enhancement or support, contact the author.
 
 =head1 AUTHORS
 
-        Adam Kennedy ( maintainer )
-        cpan@ali.as
-        http://ali.as/
+Adam Kennedy E<lt>adamk@cpan.orgE<gt>
 
 =head1 COPYRIGHT
 
-Copyright (c) 2002-2004 Adam Kennedy. All rights reserved.
+Copyright 2002 - 2008 Adam Kennedy.
+
 This program is free software; you can redistribute
 it and/or modify it under the same terms as Perl itself.
 
